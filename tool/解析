@@ -1,0 +1,28 @@
+schemas.py：把“可用工具”明确列出来（合同）
+    告诉模型：你只能用这几个工具、这些参数结构
+    解决：模型知道边界，不会乱造不存在的工具/参数。
+
+tool_map.py：工具名 → 真实函数 的唯一映射
+    LLM 输出 "get_order_status"，Python 知道调用哪个函数。
+    解决：工具可扩展，不用在主流程里写一堆 if-else。
+
+executors.py：真正执行业务（安全边界）
+    这里才是执行：未来可以接 DB/RPC/HTTP、加权限校验、加风控、加日志。
+    解决：LLM 永远碰不到数据库/接口，只能“提议”，真正执行在安全层。
+    executors.py 就像： 一把扳手，它能拧螺丝，但它不知道什么时候该拧、拧哪一颗、谁让它拧
+
+runner.py：核心——让“提议”变成“执行”
+    这个文件做了关键闭环：把 tools 和 messages 发给 LLM，LLM 返回 tool_calls（想调用工具）
+    runner 解析工具名和参数，做参数兜底/归一化（你写的类目映射就是典型）
+    调用 executor 执行，把结果以 role=tool 喂回 LLM，继续下一轮，直到 LLM 不再要工具，
+    输出最终答案
+    解决：实现“多步工具链”+“结构化执行”。
+
+executors.py 只会“执行”，但它自己永远不知道“什么时候该执行、该执行哪个工具、参数从哪来”。
+runner.py 才是把「LLM 的提议」变成「一次真实执行」的核心引擎。
+
+runner.py 负责“翻译 + 调度”；tool_map.py 只是“静态字典 / 黄页”；executors.py 只负责“被调用执行”
+
+runner.py 解析 LLM 的 tool_calls，
+使用 tool_map.py 做 name → executor 的映射，
+再调用 executors.py 完成真实业务执行。
